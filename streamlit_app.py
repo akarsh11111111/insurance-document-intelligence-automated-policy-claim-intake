@@ -38,16 +38,17 @@ st.markdown(
     """
     <style>
     :root {
-        --ink: #172a3a;
-        --muted: #647789;
-        --line: #e4ebf0;
-        --brand: #167c72;
-        --brand-dark: #11645d;
-        --canvas: #f5f8fa;
+        --ink: #1e293b;
+        --muted: #64748b;
+        --line: #e2e8f0;
+        --brand: #0f766e;
+        --brand-dark: #115e59;
+        --canvas: #f8f9fa;
     }
 
-    html, body, [class*="css"] {
-        font-family: 'Aptos', 'Segoe UI', sans-serif;
+    html, body, [class*="css"], button, input, textarea {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+            "Segoe UI", sans-serif;
         color: var(--ink);
     }
     .stApp {
@@ -64,24 +65,31 @@ st.markdown(
     [data-testid="stFileUploaderDropzoneInstructions"] small {
         color: var(--ink) !important;
     }
-    [data-testid="stHeader"] { background: rgba(245, 248, 250, 0.88); }
+    [data-testid="stHeader"] { background: rgba(248, 249, 250, 0.88); }
     [data-testid="stSidebar"] {
-        background: #f0f4f6;
+        background: #f1f5f9;
         border-right: 1px solid var(--line);
     }
-    [data-testid="stSidebar"] > div:first-child { padding-top: 1.4rem; }
+    [data-testid="stSidebar"] > div:first-child {
+        padding: 1.4rem 1rem 1rem;
+    }
     .block-container {
-        max-width: 1120px;
+        max-width: 1160px;
         margin: 0 auto;
-        padding-top: 2rem;
+        padding-top: 2.25rem;
         padding-bottom: 3rem;
     }
     h1, h2, h3 {
-        font-family: 'Aptos Display', 'Segoe UI', sans-serif !important;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+            "Segoe UI", sans-serif !important;
         color: var(--ink) !important;
         letter-spacing: -0.035em;
     }
-    h1 { font-size: clamp(2rem, 3vw, 2.8rem) !important; }
+    h1 {
+        font-size: clamp(2rem, 3.2vw, 2.85rem) !important;
+        font-weight: 800 !important;
+        line-height: 1.12 !important;
+    }
     h2 { font-size: 1.35rem !important; }
     h3 { font-size: 1.05rem !important; }
     [data-testid="stMetric"] {
@@ -97,28 +105,28 @@ st.markdown(
     }
     [data-testid="stMetricValue"] {
         color: var(--ink);
-        font-family: 'Aptos Display', 'Segoe UI', sans-serif;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
     }
     [data-testid="stVerticalBlockBorderWrapper"] {
         background: #fff;
         border-color: var(--line) !important;
-        border-radius: 16px;
-        box-shadow: 0 3px 12px rgba(27, 55, 75, 0.035);
+        border-radius: 18px;
+        box-shadow: 0 8px 28px rgba(15, 23, 42, 0.045);
     }
     [data-testid="stFileUploader"] section {
-        background: #f9fbfc;
-        border: 1px dashed #9bb9b4;
-        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px dashed #94a3b8;
+        border-radius: 12px;
     }
     [data-testid="stFormSubmitButton"] button,
     [data-testid="stDownloadButton"] button {
         background: var(--brand);
         color: #fff;
         border: 1px solid var(--brand);
-        border-radius: 10px;
-        min-height: 2.8rem;
+        border-radius: 8px;
+        min-height: 3rem;
         font-weight: 700;
-        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+        transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
     }
     [data-testid="stFormSubmitButton"] button:hover,
     [data-testid="stDownloadButton"] button:hover {
@@ -156,8 +164,8 @@ st.markdown(
         text-transform: uppercase;
     }
     .hero-copy {
-        max-width: 800px;
-        margin-top: -0.65rem;
+        max-width: 760px;
+        margin: 0.15rem auto 0;
         color: var(--muted);
         font-size: 1.03rem;
         line-height: 1.7;
@@ -198,10 +206,27 @@ st.markdown(
         padding: 0.9rem;
         border: 1px solid var(--line);
         border-radius: 12px;
-        background: #f9fbfc;
+        background: #fff;
         color: var(--muted);
         font-size: 0.83rem;
         line-height: 1.55;
+    }
+    .github-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--brand-dark) !important;
+        font-size: 0.88rem;
+        font-weight: 700;
+        text-decoration: none !important;
+    }
+    .github-link:hover { text-decoration: underline !important; }
+    @media (max-width: 640px) {
+        .block-container {
+            padding: 1.25rem 1rem 2rem;
+        }
+        h1 { font-size: 2rem !important; }
+        .eyebrow { font-size: 0.66rem; }
     }
     footer { visibility: hidden; }
     </style>
@@ -310,29 +335,42 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     st.divider()
+    st.markdown(
+        '<a class="github-link" href="https://github.com/akarsh11111111" '
+        'target="_blank" rel="noopener noreferrer">GitHub profile <span>↗</span></a>',
+        unsafe_allow_html=True,
+    )
+    st.write("")
     st.caption("Insurance Document Intelligence")
 
-st.markdown('<div class="eyebrow">Claims operations · Document intelligence</div>', unsafe_allow_html=True)
-st.title("Insurance Document Intelligence for Automated Policy and Claim Intake")
-st.markdown(
-    '<div class="hero-copy">Automated policy and claim intake, built to turn insurance '
-    "documents into structured information your team can review.</div>",
-    unsafe_allow_html=True,
-)
-st.write("")
+_, hero_column, _ = st.columns([1, 8, 1])
+with hero_column:
+    st.markdown(
+        '<div class="eyebrow">Claims operations · Document intelligence</div>',
+        unsafe_allow_html=True,
+    )
+    st.title("Insurance Document Intelligence for Automated Policy and Claim Intake")
+    st.markdown(
+        '<div class="hero-copy">Automated policy and claim intake, built to turn '
+        "insurance documents into structured information your team can review.</div>",
+        unsafe_allow_html=True,
+    )
+    st.write("")
 
-with st.container(border=True):
-    with st.form("claim_intake_form", clear_on_submit=False):
-        uploaded_file = st.file_uploader(
-            "Upload a claim or policy document",
-            type=["pdf", "png", "jpg", "jpeg"],
-            help="Choose a PDF or image. Maximum file size is 200 MB.",
-        )
-        submitted = st.form_submit_button(
-            "Analyze document",
-            type="primary",
-            width="stretch",
-        )
+_, intake_column, _ = st.columns([1, 8, 1])
+with intake_column:
+    with st.container(border=True):
+        with st.form("claim_intake_form", clear_on_submit=False):
+            uploaded_file = st.file_uploader(
+                "Upload a claim or policy document",
+                type=["pdf", "png", "jpg", "jpeg"],
+                help="Choose a PDF or image. Maximum file size is 200 MB.",
+            )
+            submitted = st.form_submit_button(
+                "Analyze document",
+                type="primary",
+                width="stretch",
+            )
 
 if submitted:
     if uploaded_file is None:
@@ -515,6 +553,10 @@ if entities:
 st.markdown(
     "<div style='padding-top:2rem;color:#80909c;font-size:.8rem'>"
     "Insurance Document Intelligence for Automated Policy and Claim Intake"
+    " &nbsp;·&nbsp; "
+    '<a href="https://github.com/akarsh11111111" target="_blank" '
+    'rel="noopener noreferrer" style="color:#115e59;text-decoration:none;font-weight:700">'
+    "GitHub profile ↗</a>"
     "</div>",
     unsafe_allow_html=True,
 )
