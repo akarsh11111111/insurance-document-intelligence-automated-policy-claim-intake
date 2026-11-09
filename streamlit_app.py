@@ -18,7 +18,7 @@ API_URL = os.getenv("API_URL")
 MISSING_VALUES = {"", "n/a", "na", "none", "null", "not available"}
 
 st.set_page_config(
-    page_title="Insurance Document Intelligence for Automated Policy and Claim Intake",
+    page_title="Insurance Document Intelligence | Claim Intake",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -34,16 +34,73 @@ def get_gemini_secret():
         return None
 
 
+THEMES = {
+    "Light": {
+        "ink": "#1e293b",
+        "muted": "#64748b",
+        "line": "#e2e8f0",
+        "brand": "#0f766e",
+        "brand_dark": "#115e59",
+        "button_text": "#ffffff",
+        "canvas": "#f8f9fa",
+        "surface": "#ffffff",
+        "surface_soft": "#f8fafc",
+        "sidebar": "#f1f5f9",
+        "shadow": "rgba(15, 23, 42, 0.045)",
+        "header": "rgba(248, 249, 250, 0.88)",
+        "success_background": "#eff9f3",
+        "success_border": "#cde7dc",
+        "success_ink": "#23734c",
+        "color_scheme": "light",
+    },
+    "Midnight": {
+        "ink": "#e2e8f0",
+        "muted": "#94a3b8",
+        "line": "#334155",
+        "brand": "#2dd4bf",
+        "brand_dark": "#14b8a6",
+        "button_text": "#062c2b",
+        "canvas": "#0b1120",
+        "surface": "#111827",
+        "surface_soft": "#172033",
+        "sidebar": "#0f172a",
+        "shadow": "rgba(0, 0, 0, 0.24)",
+        "header": "rgba(11, 17, 32, 0.9)",
+        "success_background": "#123329",
+        "success_border": "#1f5b48",
+        "success_ink": "#86efac",
+        "color_scheme": "dark",
+    },
+    "Ocean": {
+        "ink": "#e0f2fe",
+        "muted": "#9fb9ca",
+        "line": "#28485e",
+        "brand": "#38bdf8",
+        "brand_dark": "#0ea5e9",
+        "button_text": "#082f49",
+        "canvas": "#071824",
+        "surface": "#0c2232",
+        "surface_soft": "#102b3e",
+        "sidebar": "#091d2b",
+        "shadow": "rgba(0, 0, 0, 0.28)",
+        "header": "rgba(7, 24, 36, 0.9)",
+        "success_background": "#123329",
+        "success_border": "#1f5b48",
+        "success_ink": "#86efac",
+        "color_scheme": "dark",
+    },
+}
+active_theme = THEMES.get(st.session_state.get("workspace_theme", "Light"), THEMES["Light"])
+theme_variables = "\n".join(
+    f"        --{name.replace('_', '-')}: {value};"
+    for name, value in active_theme.items()
+)
+
 st.markdown(
     """
     <style>
     :root {
-        --ink: #1e293b;
-        --muted: #64748b;
-        --line: #e2e8f0;
-        --brand: #0f766e;
-        --brand-dark: #115e59;
-        --canvas: #f8f9fa;
+THEME_VARIABLES
     }
 
     html, body, [class*="css"], button, input, textarea {
@@ -53,10 +110,13 @@ st.markdown(
     }
     .stApp {
         background: var(--canvas);
-        color-scheme: light;
+        color-scheme: var(--color-scheme);
     }
     [data-testid="stAppViewContainer"] {
         background: var(--canvas);
+        color: var(--ink);
+    }
+    [data-testid="stMain"], [data-testid="stSidebar"], p, li, label {
         color: var(--ink);
     }
     [data-testid="stWidgetLabel"] p,
@@ -65,9 +125,9 @@ st.markdown(
     [data-testid="stFileUploaderDropzoneInstructions"] small {
         color: var(--ink) !important;
     }
-    [data-testid="stHeader"] { background: rgba(248, 249, 250, 0.88); }
+    [data-testid="stHeader"] { background: var(--header); }
     [data-testid="stSidebar"] {
-        background: #f1f5f9;
+        background: var(--sidebar);
         border-right: 1px solid var(--line);
     }
     [data-testid="stSidebar"] > div:first-child {
@@ -85,19 +145,25 @@ st.markdown(
         color: var(--ink) !important;
         letter-spacing: -0.035em;
     }
-    h1 {
+    h1, .hero-title {
         font-size: clamp(2rem, 3.2vw, 2.85rem) !important;
         font-weight: 800 !important;
         line-height: 1.12 !important;
+        overflow-wrap: anywhere;
+    }
+    .hero-title {
+        margin: 0 0 0.9rem;
+        color: var(--ink);
+        letter-spacing: -0.045em;
     }
     h2 { font-size: 1.35rem !important; }
     h3 { font-size: 1.05rem !important; }
     [data-testid="stMetric"] {
-        background: #fff;
+        background: var(--surface);
         border: 1px solid var(--line);
         border-radius: 14px;
         padding: 1rem 1.1rem;
-        box-shadow: 0 2px 8px rgba(27, 55, 75, 0.035);
+        box-shadow: 0 2px 8px var(--shadow);
     }
     [data-testid="stMetricLabel"] p {
         color: var(--muted);
@@ -108,20 +174,34 @@ st.markdown(
         font-family: Inter, ui-sans-serif, system-ui, sans-serif;
     }
     [data-testid="stVerticalBlockBorderWrapper"] {
-        background: #fff;
+        background: var(--surface);
         border-color: var(--line) !important;
         border-radius: 18px;
-        box-shadow: 0 8px 28px rgba(15, 23, 42, 0.045);
+        box-shadow: 0 8px 28px var(--shadow);
     }
     [data-testid="stFileUploader"] section {
-        background: #f8fafc;
-        border: 1px dashed #94a3b8;
+        background: var(--surface-soft);
+        border: 1px dashed var(--line);
         border-radius: 12px;
+    }
+    [data-testid="stFileUploader"] button {
+        background: var(--surface);
+        color: var(--ink);
+        border: 1px solid var(--line);
+    }
+    [data-testid="stFileUploader"] button:hover {
+        border-color: var(--brand);
+        color: var(--ink);
+    }
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+        background: var(--surface);
+        border-color: var(--line);
+        color: var(--ink);
     }
     [data-testid="stFormSubmitButton"] button,
     [data-testid="stDownloadButton"] button {
         background: var(--brand);
-        color: #fff;
+        color: var(--button-text);
         border: 1px solid var(--brand);
         border-radius: 8px;
         min-height: 3rem;
@@ -131,7 +211,7 @@ st.markdown(
     [data-testid="stFormSubmitButton"] button:hover,
     [data-testid="stDownloadButton"] button:hover {
         background: var(--brand-dark);
-        color: #fff;
+        color: var(--button-text);
         border-color: var(--brand-dark);
         box-shadow: 0 7px 16px rgba(17, 100, 93, 0.2);
         transform: translateY(-1px);
@@ -143,7 +223,7 @@ st.markdown(
         gap: 0.7rem;
         margin: 0.2rem 0 1.8rem;
         color: var(--ink);
-        font: 800 1rem 'Aptos', 'Segoe UI', sans-serif;
+        font: 800 1rem Inter, ui-sans-serif, system-ui, sans-serif;
     }
     .brand-mark {
         display: grid;
@@ -175,10 +255,10 @@ st.markdown(
         align-items: center;
         gap: 0.45rem;
         padding: 0.42rem 0.75rem;
-        border: 1px solid #cde7dc;
+        border: 1px solid var(--success-border);
         border-radius: 999px;
-        background: #eff9f3;
-        color: #23734c;
+        background: var(--success-background);
+        color: var(--success-ink);
         font-size: 0.8rem;
         font-weight: 700;
     }
@@ -206,7 +286,7 @@ st.markdown(
         padding: 0.9rem;
         border: 1px solid var(--line);
         border-radius: 12px;
-        background: #fff;
+        background: var(--surface);
         color: var(--muted);
         font-size: 0.83rem;
         line-height: 1.55;
@@ -221,6 +301,11 @@ st.markdown(
         text-decoration: none !important;
     }
     .github-link:hover { text-decoration: underline !important; }
+    .app-footer {
+        padding-top: 2rem;
+        color: var(--muted);
+        font-size: 0.8rem;
+    }
     @media (max-width: 640px) {
         .block-container {
             padding: 1.25rem 1rem 2rem;
@@ -230,7 +315,7 @@ st.markdown(
     }
     footer { visibility: hidden; }
     </style>
-    """,
+    """.replace("THEME_VARIABLES", theme_variables),
     unsafe_allow_html=True,
 )
 
@@ -319,6 +404,8 @@ with st.sidebar:
         "<span>Policy Intelligence</span></div>",
         unsafe_allow_html=True,
     )
+    st.selectbox("Workspace theme", list(THEMES), key="workspace_theme")
+    st.caption("Choose a light or dark look for your workspace.")
     st.markdown("### Claim workspace")
     st.caption("Automated intake and policy document review")
     st.divider()
@@ -349,7 +436,10 @@ with hero_column:
         '<div class="eyebrow">Claims operations · Document intelligence</div>',
         unsafe_allow_html=True,
     )
-    st.title("Insurance Document Intelligence for Automated Policy and Claim Intake")
+    st.markdown(
+        '<h1 class="hero-title">Insurance Document Intelligence</h1>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         '<div class="hero-copy">Automated policy and claim intake, built to turn '
         "insurance documents into structured information your team can review.</div>",
@@ -551,7 +641,7 @@ if entities:
         st.json(entities)
 
 st.markdown(
-    "<div style='padding-top:2rem;color:#80909c;font-size:.8rem'>"
+    "<div class='app-footer'>"
     "Insurance Document Intelligence for Automated Policy and Claim Intake"
     " &nbsp;·&nbsp; "
     '<a href="https://github.com/akarsh11111111" target="_blank" '
