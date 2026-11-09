@@ -136,7 +136,7 @@ THEME_VARIABLES
     .block-container {
         max-width: 1160px;
         margin: 0 auto;
-        padding-top: 2.25rem;
+        padding-top: 3rem !important;
         padding-bottom: 3rem;
     }
     h1, h2, h3 {
@@ -236,11 +236,17 @@ THEME_VARIABLES
         font-size: 1.15rem;
     }
     .eyebrow {
-        margin: 0 0 0.5rem;
+        display: inline-block;
+        margin: 0.4rem 0 0.65rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        background: var(--surface-soft);
         color: var(--brand-dark);
         font-size: 0.74rem;
         font-weight: 800;
         letter-spacing: 0.13em;
+        line-height: 1.4;
+        overflow: visible;
         text-transform: uppercase;
     }
     .hero-copy {
