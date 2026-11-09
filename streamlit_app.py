@@ -6,12 +6,14 @@ import httpx
 import requests
 import streamlit as st
 from google.genai.errors import APIError
+from rapidfuzz.distance import Levenshtein
 from streamlit.errors import StreamlitSecretNotFoundError
 
 from services.entity_extraction import (
     GeminiConfigurationError,
     extract_entities,
 )
+from services.image_pipeline import ImagePipelineError, ProcessedDocument, process_document
 
 
 API_URL = os.getenv("API_URL")
@@ -404,6 +406,16 @@ def parse_entities(raw_entities):
     return result
 
 
+def normalized_error(reference, recognized, *, word_level=False):
+    reference = " ".join(reference.casefold().split())
+    recognized = " ".join(recognized.casefold().split())
+    if not reference:
+        return None
+    reference_units = reference.split() if word_level else reference
+    recognized_units = recognized.split() if word_level else recognized
+    return Levenshtein.distance(reference_units, recognized_units) / len(reference_units)
+
+
 with st.sidebar:
     st.markdown(
         '<div class="brand-lockup"><span class="brand-mark">+</span>'
@@ -422,7 +434,7 @@ with st.sidebar:
         <div class="sidebar-note">
         <strong>Supported files</strong><br>
         PDF, PNG, JPG, and JPEG<br><br>
-        Documents are analyzed by the configured Gemini API.
+        OpenCV enhancement and Tesseract OCR run before structured AI extraction.
         </div>
         """,
         unsafe_allow_html=True,
@@ -460,7 +472,10 @@ with intake_column:
             uploaded_file = st.file_uploader(
                 "Upload a claim or policy document",
                 type=["pdf", "png", "jpg", "jpeg"],
-                help="Choose a PDF or image. Maximum file size is 200 MB.",
+                help=(
+                    "Choose a PDF (up to 10 pages) or PNG/JPEG image. "
+                    "OpenCV processing and Tesseract OCR run before Gemini extraction."
+                ),
             )
             submitted = st.form_submit_button(
                 "Analyze document",
@@ -474,13 +489,30 @@ if submitted:
     else:
         try:
             entities_result = None
-            with st.spinner("Analyzing the document and extracting claim details..."):
-                file_bytes = uploaded_file.getvalue()
-                mime_type = uploaded_file.type or "application/octet-stream"
+            with st.spinner(
+                "Running baseline OCR, enhancing the document, and extracting claim details..."
+            ):
+                pipeline_result = process_document(
+                    uploaded_file.getvalue(),
+                    uploaded_file.type or "application/octet-stream",
+                )
+                st.session_state["document_pipeline"] = pipeline_result
+                st.session_state["pipeline_filename"] = uploaded_file.name
+
                 if API_URL:
                     response = requests.post(
                         API_URL,
-                        files={"file": (uploaded_file.name, file_bytes, mime_type)},
+                        files={
+                            "file": (
+                                uploaded_file.name,
+                                pipeline_result.processed_bytes,
+                                pipeline_result.processed_mime_type,
+                            )
+                        },
+                        data={
+                            "ocr_text": pipeline_result.enhanced_text,
+                            "preprocessed": "true",
+                        },
                         timeout=(60, 300),
                     )
                     if not response.ok:
@@ -496,9 +528,10 @@ if submitted:
                 else:
                     entities_result = parse_entities(
                         extract_entities(
-                            file_bytes,
-                            mime_type,
+                            pipeline_result.processed_bytes,
+                            pipeline_result.processed_mime_type,
                             api_key=get_gemini_secret(),
+                            ocr_text=pipeline_result.enhanced_text,
                         )
                     )
 
@@ -506,10 +539,13 @@ if submitted:
                 st.session_state["claim_result"] = entities_result
                 st.session_state["claim_filename"] = uploaded_file.name
                 st.success("Document analyzed. Review the extracted information below.")
+        except ImagePipelineError as exc:
+            st.error(f"Document processing failed: {exc}")
         except GeminiConfigurationError:
             st.error(
-                "Gemini API key is missing. Add GEMINI_API_KEY to your local .env "
-                "file or to this app's Streamlit Community Cloud secrets."
+                "The local OCR and image-processing results are available below, "
+                "but structured AI extraction needs GEMINI_API_KEY in your local "
+                ".env file or this app's Streamlit Community Cloud secrets."
             )
         except APIError as exc:
             st.error(f"Gemini could not analyze the document: {exc}")
@@ -523,6 +559,147 @@ if submitted:
             st.error(f"Could not reach the claim intake API: {exc}")
         except ValueError as exc:
             st.error(f"The extraction service returned invalid data: {exc}")
+
+pipeline = st.session_state.get("document_pipeline")
+if isinstance(pipeline, ProcessedDocument):
+    st.markdown("## Digital image processing & OCR")
+    st.caption(
+        f"Pipeline results for {html.escape(st.session_state.get('pipeline_filename', 'document'))}. "
+        "The original upload is never sent to the AI extraction service."
+    )
+    baseline_confidence = pipeline.mean_confidence("baseline_confidence")
+    enhanced_confidence = pipeline.mean_confidence("enhanced_confidence")
+    pipeline_metrics = st.columns(3)
+    pipeline_metrics[0].metric("Pages processed", len(pipeline.pages))
+    pipeline_metrics[1].metric(
+        "Baseline OCR confidence",
+        f"{baseline_confidence:.1f}%" if baseline_confidence is not None else "N/A",
+    )
+    pipeline_metrics[2].metric(
+        "Enhanced OCR confidence",
+        f"{enhanced_confidence:.1f}%" if enhanced_confidence is not None else "N/A",
+    )
+
+    page_number = st.selectbox(
+        "Pipeline page",
+        range(len(pipeline.pages)),
+        format_func=lambda index: f"Page {pipeline.pages[index].page_number}",
+    )
+    page_result = pipeline.pages[page_number]
+    pipeline_tabs = st.tabs(
+        [
+            "Original",
+            "Grayscale",
+            "CLAHE contrast",
+            "Threshold",
+            "Morphology",
+            "Region segmentation",
+            "OCR comparison",
+        ]
+    )
+    stage_names = [
+        "Original upload",
+        "Grayscale",
+        "CLAHE contrast",
+        "Adaptive threshold",
+        "Morphology cleanup",
+        "Segmented text regions",
+    ]
+    stage_descriptions = [
+        "Source page used as the untouched baseline OCR input.",
+        "RGB is converted to grayscale to isolate luminance.",
+        "CLAHE improves local contrast under uneven lighting.",
+        "Adaptive Gaussian threshold separates text from the page background.",
+        "A 2×2 morphological open removes small specks; close reconnects small character gaps.",
+        f"Contours are grouped into text regions. {page_result.region_count} regions detected.",
+    ]
+    for tab, stage_name, description in zip(
+        pipeline_tabs[:6], stage_names, stage_descriptions
+    ):
+        with tab:
+            st.caption(description)
+            st.image(page_result.previews[stage_name], width="stretch")
+
+    with pipeline_tabs[6]:
+        st.caption(
+            "Both methods use the same local Tesseract engine. Confidence is a proxy, "
+            "not measured accuracy; enter a verified transcription to calculate CER/WER."
+        )
+        baseline_column, enhanced_column = st.columns(2)
+        with baseline_column:
+            st.markdown("#### Baseline · Original")
+            st.metric(
+                "Tesseract confidence",
+                (
+                    f"{page_result.baseline_confidence:.1f}%"
+                    if page_result.baseline_confidence is not None
+                    else "N/A"
+                ),
+            )
+            st.text_area(
+                "Baseline OCR text",
+                page_result.baseline_text,
+                height=220,
+                disabled=True,
+                key=f"baseline_ocr_{page_number}",
+            )
+        with enhanced_column:
+            st.markdown("#### Enhanced · OpenCV DIP")
+            st.metric(
+                "Tesseract confidence",
+                (
+                    f"{page_result.enhanced_confidence:.1f}%"
+                    if page_result.enhanced_confidence is not None
+                    else "N/A"
+                ),
+            )
+            st.text_area(
+                "Enhanced OCR text",
+                page_result.enhanced_text,
+                height=220,
+                disabled=True,
+                key=f"enhanced_ocr_{page_number}",
+            )
+
+        reference_text = st.text_area(
+            "Verified reference text (optional)",
+            key="ocr_reference_text",
+            placeholder="Paste a ground-truth transcription to measure OCR error rates.",
+            help="CER and WER are only reported when you provide a verified transcription.",
+        )
+        if reference_text.strip():
+            baseline_cer = normalized_error(reference_text, pipeline.baseline_text)
+            enhanced_cer = normalized_error(reference_text, pipeline.enhanced_text)
+            baseline_wer = normalized_error(
+                reference_text,
+                pipeline.baseline_text,
+                word_level=True,
+            )
+            enhanced_wer = normalized_error(
+                reference_text,
+                pipeline.enhanced_text,
+                word_level=True,
+            )
+            cer_columns = st.columns(2)
+            cer_columns[0].metric(
+                "Baseline CER · lower is better",
+                f"{baseline_cer:.1%}",
+            )
+            cer_columns[1].metric(
+                "Enhanced CER · lower is better",
+                f"{enhanced_cer:.1%}",
+                delta=f"{(baseline_cer - enhanced_cer) * 100:.1f} percentage points",
+            )
+            wer_columns = st.columns(2)
+            wer_columns[0].metric(
+                "Baseline WER · lower is better",
+                f"{baseline_wer:.1%}",
+            )
+            wer_columns[1].metric(
+                "Enhanced WER · lower is better",
+                f"{enhanced_wer:.1%}",
+                delta=f"{(baseline_wer - enhanced_wer) * 100:.1f} percentage points",
+            )
 
 entities = st.session_state.get("claim_result")
 if entities:
@@ -569,6 +746,7 @@ if entities:
     with overview_tab:
         left, right = st.columns(2, gap="large")
         with left:
+            render_card("Claim summary", entities.get("Claim Summary"))
             render_card("Named insured", first_insured)
             render_card("Business profile", business)
             render_card("Agency", entities.get("Agency Information", {}))

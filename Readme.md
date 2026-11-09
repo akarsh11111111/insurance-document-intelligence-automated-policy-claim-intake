@@ -1,6 +1,6 @@
 # Insurance Document Intelligence for Automated Policy and Claim Intake
 
-An insurance operations workspace for automated policy and claim intake. Upload an ACORD 125 form or supported image to extract policyholder, coverage, location, and loss details with Gemini. Review the structured results in a Streamlit dashboard backed by FastAPI.
+An insurance operations workspace for automated policy and claim intake. Upload an ACORD 125 form or supported image to compare raw Tesseract OCR with an OpenCV-enhanced document pipeline, inspect each image-processing stage, and review structured extraction results.
 
 ## Features
 
@@ -35,8 +35,14 @@ An insurance operations workspace for automated policy and claim intake. Upload 
   - Clear API errors for missing configuration or failed requests
 
 - **Gemini Document Processing**:
-  - Sends PDF and image uploads directly to Gemini for visual and text extraction
+  - Sends only the OpenCV-enhanced document and OCR text to Gemini for extraction
   - Returns structured JSON matching the Streamlit frontend's expected schema
+- **Digital Image Processing and OCR**:
+  - Baseline Tesseract OCR is measured on the original upload.
+  - Grayscale, CLAHE contrast enhancement, adaptive thresholding, and morphological open/close are applied with OpenCV.
+  - Contours identify and display text regions on each page.
+  - Enhanced Tesseract OCR is compared with baseline confidence; provide verified ground truth to calculate character and word error rates (CER/WER).
+  - PDF and image pages show each intermediate processing result in the dashboard.
 
 - **Upload Support**: PDF and image formats
 - **Professional Claim Review**: Summary metrics and organized tabs for policy, coverage, locations, losses, and contacts
@@ -48,11 +54,13 @@ An insurance operations workspace for automated policy and claim intake. Upload 
 ├── api/                  # FastAPI routes
 │   └── routes.py
 ├── services/
-│   └── entity_extraction.py  # Gemini document and entity extraction
+│   ├── entity_extraction.py  # Gemini document and entity extraction
+│   └── image_pipeline.py     # OpenCV enhancement and local Tesseract OCR
 ├── config.py             # Loads Gemini settings from .env
 ├── main.py               # FastAPI app entry point
 ├── streamlit_app.py      # Streamlit frontend
 ├── requirements.txt      # Python dependencies
+├── packages.txt          # Tesseract system package for Streamlit Cloud
 ├── .env                  # Gemini API key (not committed)
 └── Readme.md             # Project documentation
 ```
@@ -73,6 +81,15 @@ An insurance operations workspace for automated policy and claim intake. Upload 
 3. **Install dependencies**
    ```sh
    pip install -r requirements.txt
+   ```
+
+   Install the free Tesseract OCR executable and English language data separately. On Windows, install Tesseract OCR, then reopen the terminal so it is available on `PATH`:
+   ```powershell
+   winget install --id UB-Mannheim.TesseractOCR --exact
+   ```
+   On Debian/Ubuntu:
+   ```sh
+   sudo apt-get install tesseract-ocr
    ```
 
 4. **Configure environment variables**
@@ -102,11 +119,12 @@ The dashboard calls Gemini directly, so the free Community Cloud deployment does
 
 1. Sign in to [Streamlit Community Cloud](https://share.streamlit.io/) with GitHub.
 2. Select **Create app**, then choose this repository, the `main` branch, and `streamlit_app.py`.
-3. In **Advanced settings → Secrets**, add:
+3. The root `packages.txt` installs the Tesseract executable; `requirements.txt` installs OpenCV and the Python OCR/document packages.
+4. In **Advanced settings → Secrets**, add:
    ```toml
    GEMINI_API_KEY = "your_gemini_api_key"
    ```
-4. Deploy the app. Keep the key in Streamlit Secrets; do not commit it to GitHub.
+5. Deploy the app. Keep the key in Streamlit Secrets; do not commit it to GitHub.
 
 Streamlit Community Cloud stores app secrets separately from the repository. See the [official secrets guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management).
 
@@ -117,7 +135,9 @@ Sample documents are intentionally kept out of the public GitHub repository. Use
 ## Usage
 
 - Open the Streamlit app in your browser.
-- Upload an ACORD 125 PDF or PNG/JPEG/WEBP image.
+- Upload an ACORD 125 PDF (up to 10 pages) or PNG/JPEG image.
+- Review baseline OCR and the grayscale, CLAHE, threshold, morphology, and region-segmentation stages.
+- Compare baseline with enhanced OCR. Paste a verified transcription to calculate CER/WER; without reference text, Tesseract confidence is a proxy, not measured accuracy.
 - View comprehensive extracted entities organized by sections.
 - Review premium totals and their comparison.
 - Review all business details, locations, and insurance lines.
@@ -125,7 +145,7 @@ Sample documents are intentionally kept out of the public GitHub repository. Use
 ## API Endpoint
 
 - `POST /extract`
-  Upload an ACORD 125 form and receive extracted entities as structured JSON.
+  Upload a PDF or image as `file` and receive extracted entities as structured JSON. Raw API uploads are preprocessed by the server before AI extraction. The Streamlit frontend may send an already enhanced file with `preprocessed=true` and its `ocr_text` multipart field to avoid repeating the pipeline.
 
 ## Key ACORD 125 Entities Extracted
 
