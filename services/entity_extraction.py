@@ -139,9 +139,13 @@ include private chain-of-thought.
 """
 
 
-def extract_entities(file_bytes: bytes, mime_type: str) -> str:
+def extract_entities(
+    file_bytes: bytes,
+    mime_type: str,
+    api_key: str | None = None,
+) -> str:
     """Send an uploaded PDF or image to Gemini and return frontend-compatible JSON."""
-    api_key = GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
+    api_key = api_key or GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise GeminiConfigurationError(
             "GEMINI_API_KEY is not set. Add it to the .env file before extracting."

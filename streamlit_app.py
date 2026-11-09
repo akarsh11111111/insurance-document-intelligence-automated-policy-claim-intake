@@ -2,11 +2,19 @@ import html
 import json
 import os
 
+import httpx
 import requests
 import streamlit as st
+from google.genai.errors import APIError
+from streamlit.errors import StreamlitSecretNotFoundError
+
+from services.entity_extraction import (
+    GeminiConfigurationError,
+    extract_entities,
+)
 
 
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/extract")
+API_URL = os.getenv("API_URL")
 MISSING_VALUES = {"", "n/a", "na", "none", "null", "not available"}
 
 st.set_page_config(
@@ -15,6 +23,16 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+
+def get_gemini_secret():
+    if os.getenv("GEMINI_API_KEY"):
+        return None
+    try:
+        return st.secrets["GEMINI_API_KEY"]
+    except (StreamlitSecretNotFoundError, KeyError):
+        return None
+
 
 st.markdown(
     """
@@ -321,41 +339,56 @@ if submitted:
         st.warning("Choose a document before starting analysis.")
     else:
         try:
+            entities_result = None
             with st.spinner("Analyzing the document and extracting claim details..."):
-                response = requests.post(
-                    API_URL,
-                    files={
-                        "file": (
-                            uploaded_file.name,
-                            uploaded_file.getvalue(),
-                            uploaded_file.type or "application/octet-stream",
+                file_bytes = uploaded_file.getvalue()
+                mime_type = uploaded_file.type or "application/octet-stream"
+                if API_URL:
+                    response = requests.post(
+                        API_URL,
+                        files={"file": (uploaded_file.name, file_bytes, mime_type)},
+                        timeout=(60, 300),
+                    )
+                    if not response.ok:
+                        try:
+                            detail = response.json().get("detail", response.text)
+                        except ValueError:
+                            detail = response.text
+                        st.error(
+                            f"Document analysis failed ({response.status_code}): {detail}"
                         )
-                    },
-                    timeout=(60, 300),
-                )
-            if not response.ok:
-                try:
-                    detail = response.json().get("detail", response.text)
-                except ValueError:
-                    detail = response.text
-                st.error(f"Document analysis failed ({response.status_code}): {detail}")
-            else:
-                payload = response.json()
-                st.session_state["claim_result"] = parse_entities(payload.get("entities"))
+                    else:
+                        entities_result = parse_entities(response.json().get("entities"))
+                else:
+                    entities_result = parse_entities(
+                        extract_entities(
+                            file_bytes,
+                            mime_type,
+                            api_key=get_gemini_secret(),
+                        )
+                    )
+
+            if entities_result:
+                st.session_state["claim_result"] = entities_result
                 st.session_state["claim_filename"] = uploaded_file.name
                 st.success("Document analyzed. Review the extracted information below.")
-        except requests.exceptions.ConnectionError:
+        except GeminiConfigurationError:
             st.error(
-                "The claim intake API is not reachable. Start the FastAPI backend in "
-                "a second terminal: `.venv\\Scripts\\python.exe -m uvicorn "
-                "main:app --reload --port 8000`."
+                "Gemini API key is missing. Add GEMINI_API_KEY to your local .env "
+                "file or to this app's Streamlit Community Cloud secrets."
             )
+        except APIError as exc:
+            st.error(f"Gemini could not analyze the document: {exc}")
+        except httpx.HTTPError as exc:
+            st.error(f"Could not connect to Gemini: {exc}")
+        except requests.exceptions.ConnectionError:
+            st.error("The configured claim intake API is not reachable.")
         except requests.exceptions.Timeout:
-            st.error("Analysis timed out. Check the backend and retry the document.")
+            st.error("Analysis timed out. Check the API and retry the document.")
         except requests.exceptions.RequestException as exc:
             st.error(f"Could not reach the claim intake API: {exc}")
-        except (ValueError, json.JSONDecodeError) as exc:
-            st.error(f"The backend returned an invalid extraction result: {exc}")
+        except ValueError as exc:
+            st.error(f"The extraction service returned invalid data: {exc}")
 
 entities = st.session_state.get("claim_result")
 if entities:

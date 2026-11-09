@@ -54,7 +54,6 @@ An insurance operations workspace for automated policy and claim intake. Upload 
 ├── streamlit_app.py      # Streamlit frontend
 ├── requirements.txt      # Python dependencies
 ├── .env                  # Gemini API key (not committed)
-├── render.yaml           # Render blueprint for the API and dashboard
 └── Readme.md             # Project documentation
 ```
 
@@ -85,26 +84,31 @@ An insurance operations workspace for automated policy and claim intake. Upload 
 
    `GEMINI_MODEL` is optional; it defaults to `gemini-3.8-flash`.
 
-5. **Run the backend**
+5. **Run the backend (optional)**
    ```sh
    uvicorn main:app --reload
    ```
+
+   The Streamlit dashboard can call Gemini directly. Set `API_URL` only when you want it to use a separately running FastAPI server.
 
 6. **Run the frontend**
    ```sh
    streamlit run streamlit_app.py
    ```
 
-## Deploy to Render
+## Free deployment to Streamlit Community Cloud
 
-The `render.yaml` blueprint defines separate FastAPI and Streamlit web services.
+The dashboard calls Gemini directly, so the free Community Cloud deployment does not require a separate FastAPI service.
 
-1. [Deploy this repository to Render](https://render.com/deploy?repo=https://github.com/akarsh11111111/insurance-document-intelligence-automated-policy-claim-intake).
-2. Apply the Blueprint defined by `render.yaml`.
-3. Add `GEMINI_API_KEY` to the backend service's environment variables. Do not commit the key to GitHub.
-4. The dashboard calls the API service configured by `API_URL` in the blueprint.
+1. Sign in to [Streamlit Community Cloud](https://share.streamlit.io/) with GitHub.
+2. Select **Create app**, then choose this repository, the `main` branch, and `streamlit_app.py`.
+3. In **Advanced settings → Secrets**, add:
+   ```toml
+   GEMINI_API_KEY = "your_gemini_api_key"
+   ```
+4. Deploy the app. Keep the key in Streamlit Secrets; do not commit it to GitHub.
 
-Free Render services may sleep when idle, so the first request can take longer to respond.
+Streamlit Community Cloud stores app secrets separately from the repository. See the [official secrets guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management).
 
 ## Sample ACORD 125 Forms
 
