@@ -10,7 +10,7 @@ API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/extract")
 MISSING_VALUES = {"", "n/a", "na", "none", "null", "not available"}
 
 st.set_page_config(
-    page_title="Insurance Document Intelligence for Automated Policy",
+    page_title="Insurance Document Intelligence for Automated Policy and Claim Intake",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -295,7 +295,7 @@ with st.sidebar:
     st.caption("Insurance Document Intelligence")
 
 st.markdown('<div class="eyebrow">Claims operations · Document intelligence</div>', unsafe_allow_html=True)
-st.title("Insurance Document Intelligence for Automated Policy")
+st.title("Insurance Document Intelligence for Automated Policy and Claim Intake")
 st.markdown(
     '<div class="hero-copy">Automated policy and claim intake, built to turn insurance '
     "documents into structured information your team can review.</div>",
@@ -481,7 +481,7 @@ if entities:
 
 st.markdown(
     "<div style='padding-top:2rem;color:#80909c;font-size:.8rem'>"
-    "Insurance Document Intelligence for Automated Policy · Claim Intake"
+    "Insurance Document Intelligence for Automated Policy and Claim Intake"
     "</div>",
     unsafe_allow_html=True,
 )
